@@ -13,7 +13,7 @@ from logging.handlers import TimedRotatingFileHandler
 from config import Config
 import os
 import sys
-from database import DataBase
+from mongodb import MongoDataBase
 from aiohttp import web
 
 
@@ -72,7 +72,7 @@ async def main():
         logger.info("Start Main")
         lock = asyncio.Lock()
 
-        database = DataBase(Config.ticker_PRIORITY_EXCHANGE)
+        database = MongoDataBase(Config.ticker_PRIORITY_EXCHANGE)
 
         app = web.Application()
         app.add_routes([web.get('/', state)])

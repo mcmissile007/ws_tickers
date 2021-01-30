@@ -7,7 +7,7 @@ import time
 from collections import defaultdict
 from pymongo import MongoClient
 from aiohttp import ClientSession
-from database import DataBase
+from mongodb import MongoDataBase
 from datetime import datetime
 
 
@@ -16,14 +16,14 @@ from exchange import Exchange
 
 class Bittrex(Exchange):
 
-    def __init__(self, database: DataBase, pairs_to_record: list):
+    def __init__(self, mongodb: MongoDataBase, pairs_to_record: list):
 
         self.logger = logging.getLogger(
             Config.LOGGING_NAME + "." + str(__name__))
         self.logger.debug(f"Init {str(__name__)}")
         
-        self.database = database
-        self.logger.debug(f"database id:{id(self.database)}")
+        self.mongodb = mongodb
+        self.logger.debug(f"mongodb id:{id(self.mongodb)}")
 
         self.min_diff_to_insert = 10
         
@@ -67,9 +67,9 @@ class Bittrex(Exchange):
                             if ticker is not None:
                                 try:
                                     async with lock:
-                                        self.database.insert("tickers",ticker)
+                                        self.mongodb.insert("tickers",ticker)
                                 except Exception as e:
-                                    self.logger.error(f"Exception in Insert DataBase:{e}->{traceback.format_exc()}")
+                                    self.logger.error(f"Exception in Insert MongoDataBase:{e}->{traceback.format_exc()}")
                                     return
                             await asyncio.sleep(1)
 

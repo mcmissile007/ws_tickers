@@ -6,8 +6,7 @@ import traceback
 import sys
 import time
 from collections import defaultdict
-from pymongo import MongoClient
-from database import DataBase
+from mongodb import MongoDataBase
 from datetime import datetime
 
 
@@ -19,7 +18,7 @@ from exchange import Exchange
  
 class Poloniex(Exchange):
 
-    def __init__(self, database: DataBase, pairs_to_record: list):
+    def __init__(self, mongodb: MongoDataBase, pairs_to_record: list):
 
 
         # dot notation parent.child
@@ -27,8 +26,8 @@ class Poloniex(Exchange):
             Config.LOGGING_NAME + "." + str(__name__))
         self.logger.debug(f"Init {str(__name__)}")
 
-        self.database = database
-        self.logger.debug(f"database id:{id(self.database)}")
+        self.mongodb = mongodb
+        self.logger.debug(f"mongodb id:{id(self.mongodb)}")
 
         self.min_diff_to_insert = 10
         self.last_insert_epoch = defaultdict(int)
@@ -71,7 +70,7 @@ class Poloniex(Exchange):
         if (insert_diff > self.min_diff_to_insert):
             try:
                 self.logger.debug(f"Poloniex:{ticker}")
-                self.database.insert("tickers",ticker)
+                self.mongodb.insert("tickers",ticker)
                 self.last_insert_epoch[ticker['pair']] = ticker['epoch']
             except Exception as e:
                 self.logger.error("Error in  Database")

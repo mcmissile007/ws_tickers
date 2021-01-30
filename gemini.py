@@ -7,7 +7,7 @@ import sys
 import time
 from collections import defaultdict
 from pymongo import MongoClient
-from database import DataBase
+from mongodb import MongoDataBase
 from datetime import datetime
 
 from config import Config
@@ -15,14 +15,14 @@ from exchange import Exchange
 
 class Gemini(Exchange):
 
-    def __init__(self, database: DataBase, pairs_to_record: list):
+    def __init__(self, mongodb: MongoDataBase, pairs_to_record: list):
 
         self.logger = logging.getLogger(
             Config.LOGGING_NAME + "." + str(__name__))
         self.logger.debug(f"Init {str(__name__)}")
         
-        self.database = database
-        self.logger.debug(f"database id:{id(self.database)}")
+        self.mongodb = mongodb
+        self.logger.debug(f"database id:{id(self.mongodb)}")
 
         self.pairs_to_record = [quote + base for base,quote in pairs_to_record]
         self.candles_type = "candles_5m"
@@ -81,9 +81,9 @@ class Gemini(Exchange):
                                 self.logger.debug(f"Gemini candle:{candle}")
                                 try:
                                     async with lock:
-                                        self.database.insert("candles",candle)
+                                        self.mongodb.insert("candles",candle)
                                 except Exception as e:
-                                    self.logger.error(f"Exception in Insert DataBase:{e}->{traceback.format_exc()}")
+                                    self.logger.error(f"Exception in Insert MongoDataBase:{e}->{traceback.format_exc()}")
                                     return
             except Exception as e:
                 self.logger.error(f"Exception:{e}->{traceback.format_exc()}")
