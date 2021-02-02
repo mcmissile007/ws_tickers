@@ -58,8 +58,10 @@ class MongoDataBase(metaclass=Singleton):
         w=majority
         retryWrites=true retry certain write operations a single time if they fail.
         '''
-        #uri = f"mongodb+srv://{DataBaseConfig.user}:{DataBaseConfig.password}@{DataBaseConfig.host}/{DataBaseConfig.database}?retryWrites=true&w=majority"
-        uri = f"mongodb://{MongoDataBaseConfig.user}:{MongoDataBaseConfig.password}@{MongoDataBaseConfig.host}/{MongoDataBaseConfig.database}?retryWrites=true&w=majority"
+        if MongoDataBaseConfig.atlas:
+            uri = f"mongodb+srv://{MongoDataBaseConfig.user}:{MongoDataBaseConfig.password}@{MongoDataBaseConfig.host}/{MongoDataBaseConfig.database}?retryWrites=true&w=majority"
+        else:
+            uri = f"mongodb://{MongoDataBaseConfig.user}:{MongoDataBaseConfig.password}@{MongoDataBaseConfig.host}/{MongoDataBaseConfig.database}"
         try:
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
         except Exception as e:

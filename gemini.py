@@ -8,6 +8,7 @@ import time
 from collections import defaultdict
 from pymongo import MongoClient
 from mongodb import MongoDataBase
+from mysqldb import MysqlDataBase
 from datetime import datetime
 
 from config import Config
@@ -15,17 +16,20 @@ from exchange import Exchange
 
 class Gemini(Exchange):
 
-    def __init__(self, mongodb: MongoDataBase, pairs_to_record: list):
+    def __init__(self, mongodb: MongoDataBase, mysqldb: MysqlDataBase, pairs_to_record: list):
 
         self.logger = logging.getLogger(
             Config.LOGGING_NAME + "." + str(__name__))
         self.logger.debug(f"Init {str(__name__)}")
         
         self.mongodb = mongodb
-        self.logger.debug(f"database id:{id(self.mongodb)}")
+        self.mysqldb = mysqldb
+        self.logger.debug(f"mongodb id:{id(self.mongodb)}")
+        self.logger.debug(f"mysqldb id:{id(self.mysqldb)}")
 
         self.pairs_to_record = [quote + base for base,quote in pairs_to_record]
         self.candles_type = "candles_5m"
+        self.candles_type_seconds = 300
 
 
     def __parse_candle_response(self, response: dict) -> dict:
@@ -41,9 +45,10 @@ class Gemini(Exchange):
         if type(candle) == list and len(candle) == 6:
             new_candle = {}
             new_candle['source'] = "gemini"
-            new_candle['frame'] = self.candles_type.split("_")[1]
+            #new_candle['frame'] = self.candles_type.split("_")[1]
+            new_candle['frame'] = int(self.candles_type_seconds)
             new_candle['epoch'] = int(candle[0]/1000) #in seconds
-            new_candle['date'] = datetime.utcfromtimestamp(new_candle['epoch']).strftime('%Y-%m-%d %H:%M:%S')
+            new_candle['ts'] = datetime.utcfromtimestamp(new_candle['epoch']).strftime('%Y-%m-%d %H:%M:%S')
             new_candle['pair'] = str(pair)
             new_candle['open'] = float(candle[1])
             new_candle['high'] = float(candle[2])
@@ -84,6 +89,12 @@ class Gemini(Exchange):
                                         self.mongodb.insert("candles",candle)
                                 except Exception as e:
                                     self.logger.error(f"Exception in Insert MongoDataBase:{e}->{traceback.format_exc()}")
+                                    return
+                                try:
+                                    async with lock:
+                                        self.mysqldb.insert("candles",candle)
+                                except Exception as e:
+                                    self.logger.error(f"Exception in Insert MysqlDataBase:{e}->{traceback.format_exc()}")
                                     return
             except Exception as e:
                 self.logger.error(f"Exception:{e}->{traceback.format_exc()}")

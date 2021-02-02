@@ -7,6 +7,7 @@ import sys
 import time
 from collections import defaultdict
 from mongodb import MongoDataBase
+from mysqldb import MysqlDataBase
 from datetime import datetime
 
 
@@ -18,7 +19,7 @@ from exchange import Exchange
  
 class Poloniex(Exchange):
 
-    def __init__(self, mongodb: MongoDataBase, pairs_to_record: list):
+    def __init__(self, mongodb: MongoDataBase, mysqldb: MysqlDataBase , pairs_to_record: list):
 
 
         # dot notation parent.child
@@ -27,7 +28,10 @@ class Poloniex(Exchange):
         self.logger.debug(f"Init {str(__name__)}")
 
         self.mongodb = mongodb
+        self.mysqldb = mysqldb
         self.logger.debug(f"mongodb id:{id(self.mongodb)}")
+        self.logger.debug(f"mysqldb id:{id(self.mysqldb)}")
+
 
         self.min_diff_to_insert = 10
         self.last_insert_epoch = defaultdict(int)
@@ -54,7 +58,7 @@ class Poloniex(Exchange):
                 new_ticker = {}
                 new_ticker['source'] = "poloniex"
                 new_ticker['epoch'] = int(time.time())
-                new_ticker['date'] = datetime.utcfromtimestamp(new_ticker['epoch']).strftime('%Y-%m-%d %H:%M:%S')
+                new_ticker['ts'] = datetime.utcfromtimestamp(new_ticker['epoch']).strftime('%Y-%m-%d %H:%M:%S')
                 new_ticker['pair'] = str(currency_pair)
                 new_ticker['last'] = float(ticker[1])
                 new_ticker['ask'] = float(ticker[2])
@@ -71,6 +75,7 @@ class Poloniex(Exchange):
             try:
                 self.logger.debug(f"Poloniex:{ticker}")
                 self.mongodb.insert("tickers",ticker)
+                self.mysqldb.insert("tickers",ticker)
                 self.last_insert_epoch[ticker['pair']] = ticker['epoch']
             except Exception as e:
                 self.logger.error("Error in  Database")
@@ -103,14 +108,23 @@ class Poloniex(Exchange):
                             response = json.loads(r)
                             ticker = self.__parse_ticker_response(response)
                             if ticker is not None:
-                                try:
-                                    async with lock:
-                                        self.__insert_ticker(ticker)
-                                except Exception as e:
-                                    self.logger.error(f"Exception in Insert DataBase:{e}->{traceback.format_exc()}")
-                                    return
-                                
-
+                                insert_diff = ticker['epoch'] - self.last_insert_epoch[ticker['pair']]
+                                if (insert_diff > self.min_diff_to_insert):
+                                    self.logger.debug(f"Poloniex:{ticker}")
+                                    try:
+                                        async with lock:
+                                             self.mongodb.insert("tickers",ticker)
+                                    except Exception as e:
+                                        self.logger.error(f"Exception in Insert MongoDataBase:{e}->{traceback.format_exc()}")
+                                        return
+                                    try:
+                                        async with lock:
+                                             self.mysqldb.insert("tickers",ticker)
+                                    except Exception as e:
+                                        self.logger.error(f"Exception in Insert MysqlDataBase:{e}->{traceback.format_exc()}")
+                                        return
+                                    self.last_insert_epoch[ticker['pair']] = ticker['epoch']
+ 
             except Exception as e:
                 self.logger.error(f"Exception:{e}->{traceback.format_exc()}")
 

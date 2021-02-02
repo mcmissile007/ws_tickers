@@ -8,6 +8,8 @@ from collections import defaultdict
 from pymongo import MongoClient
 from aiohttp import ClientSession
 from mongodb import MongoDataBase
+from mysqldb import MysqlDataBase
+
 from datetime import datetime
 
 
@@ -16,14 +18,16 @@ from exchange import Exchange
 
 class Bittrex(Exchange):
 
-    def __init__(self, mongodb: MongoDataBase, pairs_to_record: list):
+    def __init__(self, mongodb: MongoDataBase, mysqldb: MysqlDataBase, pairs_to_record: list):
 
         self.logger = logging.getLogger(
             Config.LOGGING_NAME + "." + str(__name__))
         self.logger.debug(f"Init {str(__name__)}")
         
         self.mongodb = mongodb
+        self.mysqldb = mysqldb
         self.logger.debug(f"mongodb id:{id(self.mongodb)}")
+        self.logger.debug(f"mysqldb id:{id(self.mysqldb)}")
 
         self.min_diff_to_insert = 10
         
@@ -43,7 +47,7 @@ class Bittrex(Exchange):
                 quote,base = ticker['symbol'].split("-")
                 new_ticker['source'] = "bittrex"
                 new_ticker['epoch'] = int(time.time())
-                new_ticker['date'] = datetime.utcfromtimestamp(new_ticker['epoch']).strftime('%Y-%m-%d %H:%M:%S')
+                new_ticker['ts'] = datetime.utcfromtimestamp(new_ticker['epoch']).strftime('%Y-%m-%d %H:%M:%S')
                 new_ticker['pair'] = base + "_" + quote
                 new_ticker['last'] = float(ticker['lastTradeRate'])
                 new_ticker['ask'] = float(ticker['askRate'])
@@ -70,6 +74,13 @@ class Bittrex(Exchange):
                                         self.mongodb.insert("tickers",ticker)
                                 except Exception as e:
                                     self.logger.error(f"Exception in Insert MongoDataBase:{e}->{traceback.format_exc()}")
+                                    return
+                                
+                                try:
+                                    async with lock:
+                                        self.mysqldb.insert("tickers",ticker)
+                                except Exception as e:
+                                    self.logger.error(f"Exception in Insert MysqlDataBase:{e}->{traceback.format_exc()}")
                                     return
                             await asyncio.sleep(1)
 
